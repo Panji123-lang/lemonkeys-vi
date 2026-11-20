@@ -24,6 +24,7 @@ import {
 import { AdminLoginModal, ChangePinModal } from './components/AdminAuthModals';
 import LeonidaMapCard from './components/LeonidaMapCard';
 import MusicPlayerBanner from './components/MusicPlayerBanner';
+import { syncDocumentFavicon } from './lib/favicon';
 import {
   isSupabaseReady,
   fetchCheatsRemote,
@@ -200,6 +201,11 @@ export default function App() {
     };
   }, []);
 
+  /* Sync Browser Tab Favicon with Active Brand Logo */
+  useEffect(() => {
+    syncDocumentFavicon(brandLogo);
+  }, [brandLogo]);
+
   /* Sync Local Cache */
   useEffect(() => {
     localStorage.setItem('lkvi_lang', JSON.stringify(lang));
@@ -356,6 +362,7 @@ export default function App() {
 
   const handleSaveBrandLogo = async (nextLogo) => {
     setBrandLogo(nextLogo);
+    syncDocumentFavicon(nextLogo);
     if (isSupabaseReady && adminSessionPin) {
       try {
         await saveSiteSettingRemote(adminSessionPin, 'brand_logo', nextLogo);

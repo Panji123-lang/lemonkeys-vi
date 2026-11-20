@@ -1,0 +1,21 @@
+{
+  "name": "LemonKeyS' VI — GTA 6 Community Hub",
+  "short_name": "LemonKeyS' VI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#151221",
+  "theme_color": "#151221",
+  "icons": [
+    {
+      "src": "/logo.png?v=3",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg?v=3",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
