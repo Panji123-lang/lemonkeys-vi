@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-padding-top: 88px;
+  }
+}
+
+@keyframes driftSlow {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(26px, 20px, 0) scale(1.07); }
+}
+
+@keyframes modalUp {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes drawerIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmerFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes floatGentle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes popCard {
+  from { opacity: 0; transform: translateY(16px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Music Player: Vinyl Spin, Orbiting & Rising Notes, Equalizer */
+@keyframes vinylSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes noteOrbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes noteRiseA {
+  0% { opacity: 0; transform: translate3d(0, 6px, 0) scale(0.75) rotate(-14deg); }
+  25% { opacity: 0.95; }
+  80% { opacity: 0.85; }
+  100% { opacity: 0; transform: translate3d(12px, -22px, 0) scale(1.05) rotate(18deg); }
+}
+
+@keyframes noteRiseB {
+  0% { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.7) rotate(12deg); }
+  30% { opacity: 0.9; }
+  80% { opacity: 0.75; }
+  100% { opacity: 0; transform: translate3d(-11px, -24px, 0) scale(1.08) rotate(-18deg); }
+}
+
+@keyframes eqBounce {
+  0%, 100% { transform: scaleY(0.28); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes barDrain {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+.animate-drift {
+  animation: driftSlow 20s ease-in-out infinite alternate;
+}
+
+.animate-modal {
+  animation: modalUp 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-drawer {
+  animation: drawerIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-shimmer {
+  background-size: 200% 200%;
+  animation: shimmerFlow 6s ease infinite;
+}
+
+.animate-float {
+  animation: floatGentle 3.6s ease-in-out infinite;
+}
+
+.animate-card-in {
+  animation: popCard 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-vinyl {
+  animation: vinylSpin 3.2s linear infinite;
+}
+
+.animate-note-orbit {
+  animation: noteOrbit 4.2s linear infinite;
+}
+
+.animate-note-a {
+  animation: noteRiseA 2.2s ease-out infinite;
+}
+
+.animate-note-b {
+  animation: noteRiseB 2.6s ease-out 0.9s infinite;
+}
+
+.animate-eq-1 { animation: eqBounce 0.75s ease-in-out infinite; }
+.animate-eq-2 { animation: eqBounce 0.58s ease-in-out 0.15s infinite; }
+.animate-eq-3 { animation: eqBounce 0.85s ease-in-out 0.3s infinite; }
+.animate-eq-4 { animation: eqBounce 0.65s ease-in-out 0.08s infinite; }
+
+.animate-drain {
+  transform-origin: left center;
+  animation: barDrain 5.5s linear forwards;
+}
+
+.anim-paused {
+  animation-play-state: paused !important;
+}
+
+.vinyl-grooves {
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.22) 0%, transparent 36%),
+    repeating-radial-gradient(
+      circle at center,
+      #141022 0px,
+      #141022 2px,
+      #251e3d 2.8px,
+      #141022 3.8px
+    );
+}
+
+/* Scroll Reveal */
+.reveal-item {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 520ms cubic-bezier(0.16, 1, 0.3, 1), transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-item.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Interactive Card Spotlight Glow */
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.spotlight-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 280ms ease;
+  background: radial-gradient(
+    280px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(223, 143, 163, 0.16),
+    rgba(167, 139, 250, 0.08) 45%,
+    transparent 75%
+  );
+}
+
+.spotlight-card:hover::after {
+  opacity: 1;
+}
