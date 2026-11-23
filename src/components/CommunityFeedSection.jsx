@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   INITIAL_COMMUNITY_POSTS,
+  hydrateCommunityPosts,
+  translateTextClient,
   fetchCommunityPostsRemote,
   createCommunityPostRemote,
   likeCommunityPostRemote,
@@ -98,7 +100,7 @@ export default function CommunityFeedSection({
   const isId = lang === 'id';
 
   const [posts, setPosts] = useState(() =>
-    readCache('lkvi_community_posts_v1', INITIAL_COMMUNITY_POSTS)
+    hydrateCommunityPosts(readCache('lkvi_community_posts_v1', INITIAL_COMMUNITY_POSTS))
   );
   const [likedIds, setLikedIds] = useState(() =>
     readCache('lkvi_liked_posts_v1', [])
@@ -118,7 +120,11 @@ export default function CommunityFeedSection({
   const [confirmDeletePostId, setConfirmDeletePostId] = useState('');
   const [lightboxImage, setLightboxImage] = useState(null);
 
-  /* Saved Author Identity (Avoids Redundant Entry) */
+  /* On-Demand Post Translation Cache */
+  const [translatedPosts, setTranslatedPosts] = useState({});
+  const [translatingId, setTranslatingId] = useState('');
+
+  /* Saved Author Identity */
   const savedProfile = useMemo(
     () => readCache('lkvi_author_profile', { author: '', region: 'Indonesia' }),
     []
@@ -146,7 +152,7 @@ export default function CommunityFeedSection({
       try {
         const remote = await fetchCommunityPostsRemote();
         if (active && Array.isArray(remote)) {
-          setPosts(remote);
+          setPosts(hydrateCommunityPosts(remote));
         }
       } catch (err) {
         console.error('Failed loading community posts:', err);
@@ -205,6 +211,43 @@ export default function CommunityFeedSection({
     return isId ? found.idLabel : found.enLabel;
   };
 
+  const handleToggleTranslatePost = async (post) => {
+    const cacheKey = `${post.id}:${lang}`;
+    const existing = translatedPosts[cacheKey];
+
+    if (existing) {
+      setTranslatedPosts((prev) => ({
+        ...prev,
+        [cacheKey]: { ...existing, active: !existing.active },
+      }));
+      return;
+    }
+
+    setTranslatingId(post.id);
+    try {
+      const [trTitle, trBody] = await Promise.all([
+        translateTextClient(post.title, lang),
+        translateTextClient(post.body, lang),
+      ]);
+      setTranslatedPosts((prev) => ({
+        ...prev,
+        [cacheKey]: {
+          title: trTitle || post.title,
+          body: trBody || post.body,
+          active: true,
+        },
+      }));
+    } catch {
+      onNotify(
+        isId
+          ? 'Gagal menerjemahkan postingan saat ini.'
+          : 'Could not translate this post right now.'
+      );
+    } finally {
+      setTranslatingId('');
+    }
+  };
+
   const handlePickPhoto = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -252,7 +295,9 @@ export default function CommunityFeedSection({
       region: cleanRegion,
       tag,
       title: cleanTitle,
+      titleEn: '',
       body: cleanBody,
+      bodyEn: '',
       imageUrl: imageUrl.trim(),
       likes: 0,
       pinned: false,
@@ -328,13 +373,14 @@ export default function CommunityFeedSection({
 
     setSubmittingCommentId(postId);
     const commenterName =
-      author.trim() || (isAdmin ? "LemonKeyS' VI Admin" : isId ? 'Player VI' : 'Player VI');
+      author.trim() || (isAdmin ? "LemonKeyS' VI Admin" : 'Player VI');
 
     const newComment = {
       id: `cmt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       postId,
       author: commenterName,
       body: draft,
+      bodyEn: '',
       isAdmin,
       createdAt: new Date().toISOString(),
     };
@@ -424,12 +470,16 @@ export default function CommunityFeedSection({
     }
   };
 
-  const handleSharePost = async (post) => {
+  const handleSharePost = async (post, shownTitle, shownBody) => {
     const shareUrl = `${window.location.origin}/#komunitas`;
-    const shareText = `${post.title} — LemonKeyS' VI Community\n${shareUrl}`;
+    const shareText = `${shownTitle} — LemonKeyS' VI Community\n${shareUrl}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: post.title, text: post.body.slice(0, 120), url: shareUrl });
+        await navigator.share({
+          title: shownTitle,
+          text: shownBody.slice(0, 120),
+          url: shareUrl,
+        });
         return;
       }
       if (navigator.clipboard && window.isSecureContext) {
@@ -445,7 +495,10 @@ export default function CommunityFeedSection({
     const q = search.trim().toLowerCase();
     const list = posts.filter((p) => {
       const matchTag = activeTag === 'all' || p.tag === activeTag;
-      const haystack = `${p.title} ${p.body} ${p.author} ${p.region}`.toLowerCase();
+      const haystack = [p.title, p.titleEn, p.body, p.bodyEn, p.author, p.region]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
       const matchSearch = !q || haystack.includes(q);
       return matchTag && matchSearch;
     });
@@ -479,7 +532,7 @@ export default function CommunityFeedSection({
           <button
             type="button"
             onClick={() => setComposerOpen(true)}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-vice-soft via-vice-rose to-vice-peach px-5 text-sm font-bold text-vice-deep shadow-lg shadow-vice-lavender/20 transition hover:-translate-y-0.5 active:scale-95"
+            className="inline-flex min-h-11 shrink-0 touch-manipulation items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-vice-soft via-vice-rose to-vice-peach px-5 text-sm font-bold text-vice-deep shadow-lg shadow-vice-lavender/20 transition hover:-translate-y-0.5 active:scale-95"
           >
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 20h9" />
@@ -537,7 +590,7 @@ export default function CommunityFeedSection({
                   type="button"
                   onClick={() => setSortBy(opt.key)}
                   aria-pressed={sortBy === opt.key}
-                  className={`min-h-10 rounded-lg px-3.5 text-xs font-semibold transition active:scale-95 ${
+                  className={`min-h-10 touch-manipulation rounded-lg px-3.5 text-xs font-semibold transition active:scale-95 ${
                     sortBy === opt.key
                       ? 'bg-gradient-to-r from-vice-soft to-vice-rose text-vice-deep'
                       : 'text-vice-sub hover:text-vice-text'
@@ -550,14 +603,18 @@ export default function CommunityFeedSection({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter topik post">
+            <div
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-label={isId ? 'Filter topik postingan' : 'Filter post topics'}
+            >
               {POST_TAGS.map((chip) => (
                 <button
                   key={chip.key}
                   type="button"
                   onClick={() => setActiveTag(chip.key)}
                   aria-pressed={activeTag === chip.key}
-                  className={`min-h-10 rounded-full border px-4 text-xs font-semibold transition active:scale-95 sm:text-sm ${
+                  className={`min-h-10 touch-manipulation rounded-full border px-4 text-xs font-semibold transition active:scale-95 sm:text-sm ${
                     activeTag === chip.key
                       ? 'border-vice-lavender bg-vice-lavender/25 text-vice-text shadow-sm'
                       : 'border-vice-soft/15 bg-vice-lavender/10 text-vice-sub hover:border-vice-soft/35 hover:text-vice-text'
@@ -571,7 +628,7 @@ export default function CommunityFeedSection({
             <p className="font-mono text-xs font-semibold text-vice-soft" role="status" aria-live="polite">
               {isId
                 ? `${filteredPosts.length} dari ${posts.length} postingan`
-                : `${filteredPosts.length} of ${posts.length} posts`}
+                : `${filteredPosts.length} of ${posts.length} ${posts.length === 1 ? 'post' : 'posts'}`}
             </p>
           </div>
         </div>
@@ -638,9 +695,32 @@ export default function CommunityFeedSection({
               const tagClass =
                 TAG_STYLE[post.tag] || 'bg-vice-lavender/15 text-vice-soft border-vice-lavender/25';
 
+              const hasBuiltInBilingual = Boolean(post.titleEn && post.bodyEn);
+              const cacheKey = `${post.id}:${lang}`;
+              const trEntry = translatedPosts[cacheKey];
+              const isShowingTranslation = !hasBuiltInBilingual && Boolean(trEntry?.active);
+              const isTranslating = translatingId === post.id;
+
+              const displayTitle = isShowingTranslation
+                ? trEntry.title
+                : !isId && post.titleEn
+                ? post.titleEn
+                : post.title;
+              const displayBody = isShowingTranslation
+                ? trEntry.body
+                : !isId && post.bodyEn
+                ? post.bodyEn
+                : post.body;
+
+              const commentWord = isId
+                ? 'Komentar'
+                : commentsList.length === 1
+                ? 'Comment'
+                : 'Comments';
+
               return (
                 <article
-                  key={post.id}
+                  key={`${post.id}-${lang}`}
                   onMouseMove={handleCardPointerMove}
                   style={{ animationDelay: `${Math.min(idx * 35, 220)}ms` }}
                   className={`spotlight-card animate-card-in flex flex-col gap-4 rounded-3xl border bg-vice-card/80 p-5 backdrop-blur-md transition duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/30 ${
@@ -698,22 +778,28 @@ export default function CommunityFeedSection({
 
                   {/* Content Body */}
                   <div className="space-y-2.5">
+                    {isShowingTranslation && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-vice-lavender/30 bg-vice-lavender/15 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-vice-soft">
+                        {isId ? 'Diterjemahkan ke ID' : 'Translated to EN'}
+                      </span>
+                    )}
+
                     <h3 className="break-words font-display text-lg font-bold leading-snug text-vice-text">
-                      {post.title}
+                      {displayTitle}
                     </h3>
                     <p className="whitespace-pre-line break-words text-sm leading-relaxed text-vice-sub">
-                      {post.body}
+                      {displayBody}
                     </p>
 
                     {post.imageUrl && (
                       <button
                         type="button"
-                        onClick={() => setLightboxImage({ src: post.imageUrl, title: post.title })}
+                        onClick={() => setLightboxImage({ src: post.imageUrl, title: displayTitle })}
                         className="group relative block w-full overflow-hidden rounded-2xl border border-vice-soft/20 bg-vice-deep/80 text-left focus:outline-none focus:ring-2 focus:ring-vice-lavender"
                       >
                         <img
                           src={post.imageUrl}
-                          alt={post.title}
+                          alt={displayTitle}
                           loading="lazy"
                           className="aspect-[16/9] w-full object-cover transition duration-300 group-hover:scale-[1.02]"
                         />
@@ -726,13 +812,14 @@ export default function CommunityFeedSection({
 
                   {/* Interactive Footer Bar */}
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-vice-soft/15 pt-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {/* Like Button */}
                       <button
                         type="button"
                         onClick={() => handleLikePost(post.id)}
                         aria-pressed={isLiked}
-                        className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition active:scale-90 ${
+                        aria-label={isId ? `Sukai postingan (${post.likes})` : `Like post (${post.likes})`}
+                        className={`inline-flex min-h-11 touch-manipulation items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition active:scale-90 ${
                           isLiked
                             ? 'border-vice-rose bg-vice-rose/20 text-rose-100'
                             : 'border-vice-soft/15 bg-vice-deep/65 text-vice-sub hover:border-vice-rose/45 hover:text-vice-text'
@@ -764,7 +851,7 @@ export default function CommunityFeedSection({
                           }))
                         }
                         aria-expanded={commentsOpen}
-                        className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition active:scale-95 ${
+                        className={`inline-flex min-h-11 touch-manipulation items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition active:scale-95 ${
                           commentsOpen
                             ? 'border-vice-lavender bg-vice-lavender/20 text-vice-text'
                             : 'border-vice-soft/15 bg-vice-deep/65 text-vice-sub hover:border-vice-soft/35 hover:text-vice-text'
@@ -774,17 +861,52 @@ export default function CommunityFeedSection({
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                         </svg>
                         <span className="tabular-nums">{commentsList.length}</span>
-                        <span className="hidden sm:inline">
-                          {isId ? 'Komentar' : 'Comments'}
-                        </span>
+                        <span className="hidden sm:inline">{commentWord}</span>
                       </button>
+
+                      {/* On-Demand Translate Button for Community-Submitted Posts */}
+                      {!hasBuiltInBilingual && (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTranslatePost(post)}
+                          disabled={isTranslating}
+                          aria-pressed={isShowingTranslation}
+                          className={`inline-flex min-h-11 touch-manipulation items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition active:scale-95 disabled:opacity-60 ${
+                            isShowingTranslation
+                              ? 'border-vice-soft/45 bg-vice-lavender/20 text-vice-soft'
+                              : 'border-vice-soft/15 bg-vice-deep/65 text-vice-sub hover:border-vice-soft/35 hover:text-vice-text'
+                          }`}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M5 8l6 6" />
+                            <path d="M4 14l6-6 2-3" />
+                            <path d="M2 5h12" />
+                            <path d="M7 2h1" />
+                            <path d="M22 22l-5-10-5 10" />
+                            <path d="M14 18h6" />
+                          </svg>
+                          <span>
+                            {isTranslating
+                              ? isId
+                                ? 'Menerjemahkan...'
+                                : 'Translating...'
+                              : isShowingTranslation
+                              ? isId
+                                ? 'Asli'
+                                : 'Original'
+                              : isId
+                              ? 'Terjemahkan'
+                              : 'Translate'}
+                          </span>
+                        </button>
+                      )}
 
                       {/* Share Button */}
                       <button
                         type="button"
-                        onClick={() => handleSharePost(post)}
+                        onClick={() => handleSharePost(post, displayTitle, displayBody)}
                         aria-label={isId ? 'Bagikan postingan' : 'Share post'}
-                        className="inline-flex size-11 items-center justify-center rounded-xl border border-vice-soft/15 bg-vice-deep/65 text-vice-sub transition hover:border-vice-soft/35 hover:text-vice-text active:scale-90"
+                        className="inline-flex size-11 touch-manipulation items-center justify-center rounded-xl border border-vice-soft/15 bg-vice-deep/65 text-vice-sub transition hover:border-vice-soft/35 hover:text-vice-text active:scale-90"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <circle cx="18" cy="5" r="3" />
@@ -848,39 +970,42 @@ export default function CommunityFeedSection({
                         </p>
                       ) : (
                         <ul className="space-y-2.5">
-                          {commentsList.map((cmt) => (
-                            <li
-                              key={cmt.id}
-                              className="rounded-2xl border border-vice-soft/10 bg-vice-deep/70 p-3"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                  <span className="font-bold text-vice-text">{cmt.author}</span>
-                                  {cmt.isAdmin && (
-                                    <span className="rounded-full bg-vice-mint/15 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase text-vice-mint">
-                                      Admin
+                          {commentsList.map((cmt) => {
+                            const cmtBody = !isId && cmt.bodyEn ? cmt.bodyEn : cmt.body;
+                            return (
+                              <li
+                                key={cmt.id}
+                                className="rounded-2xl border border-vice-soft/10 bg-vice-deep/70 p-3"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                    <span className="font-bold text-vice-text">{cmt.author}</span>
+                                    {cmt.isAdmin && (
+                                      <span className="rounded-full bg-vice-mint/15 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase text-vice-mint">
+                                        Admin
+                                      </span>
+                                    )}
+                                    <span className="text-[11px] text-vice-muted">
+                                      &bull; {formatRelativeTime(cmt.createdAt, isId)}
                                     </span>
-                                  )}
-                                  <span className="text-[11px] text-vice-muted">
-                                    &bull; {formatRelativeTime(cmt.createdAt, isId)}
-                                  </span>
-                                </div>
+                                  </div>
 
-                                {isAdmin && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteComment(post.id, cmt.id)}
-                                    className="text-[11px] font-semibold text-red-300 hover:text-red-200"
-                                  >
-                                    {isId ? 'Hapus' : 'Delete'}
-                                  </button>
-                                )}
-                              </div>
-                              <p className="mt-1 break-words text-xs leading-relaxed text-vice-sub">
-                                {cmt.body}
-                              </p>
-                            </li>
-                          ))}
+                                  {isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteComment(post.id, cmt.id)}
+                                      className="text-[11px] font-semibold text-red-300 hover:text-red-200"
+                                    >
+                                      {isId ? 'Hapus' : 'Delete'}
+                                    </button>
+                                  )}
+                                </div>
+                                <p className="mt-1 break-words text-xs leading-relaxed text-vice-sub">
+                                  {cmtBody}
+                                </p>
+                              </li>
+                            );
+                          })}
                         </ul>
                       )}
 
@@ -1125,7 +1250,7 @@ export default function CommunityFeedSection({
                   <div className="relative overflow-hidden rounded-xl border border-vice-soft/20">
                     <img
                       src={imagePreview}
-                      alt="Preview"
+                      alt={isId ? 'Pratinjau gambar' : 'Image preview'}
                       className="max-h-44 w-full object-cover"
                     />
                     <button
