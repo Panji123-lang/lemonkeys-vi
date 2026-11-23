@@ -24,6 +24,7 @@ import {
 import { AdminLoginModal, ChangePinModal } from './components/AdminAuthModals';
 import LeonidaMapCard from './components/LeonidaMapCard';
 import MusicPlayerBanner from './components/MusicPlayerBanner';
+import CommunityFeedSection from './components/CommunityFeedSection';
 import { syncDocumentFavicon } from './lib/favicon';
 import {
   isSupabaseReady,
@@ -161,6 +162,7 @@ export default function App() {
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.id;
   const leonidaFacts = LEONIDA_FACTS_I18N[lang] || LEONIDA_FACTS_I18N.id;
+  const navCommunityLabel = lang === 'id' ? 'Komunitas' : 'Community';
 
   const categoryLabels = useMemo(
     () => ({
@@ -624,6 +626,9 @@ export default function App() {
             <a href="#misteri" className="rounded-full px-3.5 py-2 text-sm font-medium text-vice-sub transition hover:bg-vice-lavender/15 hover:text-vice-text">
               {t.navMystery}
             </a>
+            <a href="#komunitas" className="rounded-full px-3.5 py-2 text-sm font-medium text-vice-sub transition hover:bg-vice-lavender/15 hover:text-vice-text">
+              {navCommunityLabel}
+            </a>
             <a href="#feedback" className="rounded-full px-3.5 py-2 text-sm font-medium text-vice-sub transition hover:bg-vice-lavender/15 hover:text-vice-text">
               {t.navFeedback}
             </a>
@@ -733,6 +738,7 @@ export default function App() {
               { href: '#cheats', label: t.navCheats },
               { href: '#seputar', label: t.navAbout },
               { href: '#misteri', label: t.navMystery },
+              { href: '#komunitas', label: navCommunityLabel },
               { href: '#feedback', label: t.navFeedback },
             ].map((item) => (
               <a
@@ -826,20 +832,12 @@ export default function App() {
                     <polyline points="12 5 19 12 12 19" />
                   </svg>
                 </a>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingCheat(null);
-                    setShowAddCheat(true);
-                  }}
+                <a
+                  href="#komunitas"
                   className="inline-flex min-h-11 items-center gap-2 rounded-full border border-vice-soft/30 bg-vice-deep/75 px-5 py-3 text-sm font-semibold text-vice-text backdrop-blur-md transition hover:-translate-y-0.5 hover:border-vice-peach/60 hover:bg-vice-elevated/90 active:scale-95"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  <span>{t.ctaAddCheat}</span>
-                </button>
+                  <span>{lang === 'id' ? 'Buka Community Post' : 'Open Community Posts'}</span>
+                </a>
               </div>
 
               <div className="reveal-item mt-9 grid max-w-2xl grid-cols-3 gap-3">
@@ -1282,7 +1280,15 @@ export default function App() {
           </div>
         </section>
 
-        {/* Section 4: Feedback & Owner Contact */}
+        {/* Section 4: Global Community Posts */}
+        <CommunityFeedSection
+          lang={lang}
+          isAdmin={isAdmin}
+          adminSessionPin={adminSessionPin}
+          onNotify={notify}
+        />
+
+        {/* Section 5: Feedback & Owner Contact */}
         <section id="feedback" className="py-16 md:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="reveal-item grid grid-cols-1 gap-6 lg:grid-cols-5">
@@ -1426,6 +1432,7 @@ export default function App() {
             <a href="#cheats" className="hover:text-vice-peach">{t.navCheats}</a>
             <a href="#seputar" className="hover:text-vice-peach">{t.navAbout}</a>
             <a href="#misteri" className="hover:text-vice-peach">{t.navMystery}</a>
+            <a href="#komunitas" className="hover:text-vice-peach">{navCommunityLabel}</a>
             <a href="#feedback" className="hover:text-vice-peach">{t.navFeedback}</a>
 
             {!isAdmin ? (
